@@ -42,8 +42,8 @@ func Auth(ctx *fasthttp.RequestCtx) {
 		sha := sha1.New()
 		sha.Write([]byte(base64.StdEncoding.EncodeToString(bytes)))
 		id := hex.EncodeToString(sha.Sum(nil))
-		ledger[id[0:32]] = time.Now().String()
 		timein := time.Now().Local().AddDate(0, 0, 60)
+		ledger[id[0:32]] = timein.String()
 		data, _ := json.Marshal(Body{Token: id[0:32], Tok_expr: timein.String()})
 		fmt.Fprintf(ctx, string(data))
 	case "new":
@@ -130,26 +130,25 @@ func Auth(ctx *fasthttp.RequestCtx) {
 func RemoveExpired() {
 	ticker := time.NewTicker(2 * time.Second)
 	quit := make(chan string)
-	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				{
-					for key, element := range ledger {
-						then, _ := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", element)
-						since := time.Since(then)
-						if since.Hours() <= 1440 {
-							delete(ledger, key)
-							user.UnLink(key)
-						}
+	for {
+		select {
+		case <-ticker.C:
+			{
+				for key, element := range ledger {
+					fmt.Println(key, element)
+					then, _ := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", element)
+					since := time.Since(then)
+					if since.Hours() >= 1440 {
+						delete(ledger, key)
+						user.UnLink(key)
 					}
 				}
-			case <-quit:
-				ticker.Stop()
-				return
 			}
+		case <-quit:
+			ticker.Stop()
+			return
 		}
-	}()
+	}
 }
 func Run() {
 	r := router.New()
@@ -157,6 +156,6 @@ func Run() {
 	r.GET("/geo/{op}", Endpoint)
 	r.GET("/chat/{op}", ChatEndpoint)
 
-	go log.Fatal(fasthttp.ListenAndServe(":8080", r.Handler))
 	go RemoveExpired()
+	go log.Fatal(fasthttp.ListenAndServe(":8080", r.Handler))
 }
