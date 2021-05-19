@@ -54,11 +54,10 @@ var broadcast = make(chan string)
 var mutex sync.Mutex
 
 func handleMessages(id int) {
-	defer mutex.Lock()
-	mutex.Unlock()
 	for {
 		msg := <-broadcast
 		for client, RID := range clients {
+			mutex.Lock()
 			if RID == id {
 				err := client.WriteJSON(msg)
 				if err != nil {
@@ -67,6 +66,7 @@ func handleMessages(id int) {
 					//delete(clients, client)
 				}
 			}
+			mutex.Unlock()
 		}
 	}
 }
